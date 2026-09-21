@@ -11,7 +11,7 @@ from agentdi.core import Channel, Money, Source
 from agentdi.journal import Journal
 from agentdi.payments import build_upi_intent
 from agentdi.policy import Mandate, Period, PolicyContext, PolicyEngine, Rail
-from tests.test_engine import BLINKIT, ITEMS, REG, ZEPTO
+from tests.test_engine import BLINKIT, ITEMS, REG, ZEPTO, offer
 
 NOW = datetime(2026, 10, 1, 10, 0)
 ZEPTO_MANDATE = Mandate(
@@ -32,8 +32,22 @@ def test_approval_card_explains_the_switch():
     outcome = plan_outcome()
     card = build_approval_card(outcome, REG, preferred_store="blinkit")
     assert card.total == outcome.best.total
-    assert any("wasn't available at Blinkit" in n and "Zepto" in n for n in card.notes)
+    assert any(n.startswith("Epigamia") and "isn't in stock at Blinkit" in n and "Zepto" in n for n in card.notes)
+    assert not any(n.startswith("Milk") and "isn't in stock" in n for n in card.notes)
     assert any("BigBasket has no official API" in n for n in card.notes)
+
+
+def test_items_moved_for_price_are_not_called_unavailable():
+    # Zepto also stocks milk and bread and a single Zepto delivery is cheapest.
+    zepto = ZEPTO + [offer("zepto", "Britannia White Bread", 48)]
+    engine = CrossStoreEngine([SimulatedStore("blinkit", BLINKIT), SimulatedStore("zepto", zepto)], REG)
+    outcome = asyncio.run(engine.plan(ITEMS, OptimizerConfig(preferred_store="blinkit")))
+    assert outcome.best.store_ids == ("zepto",)
+    assert any("blinkit" in p.store_ids for p in outcome.plans)  # the keep-your-store option is offered
+    card = build_approval_card(outcome, REG, preferred_store="blinkit")
+    moved = [n for n in card.notes if "also at Blinkit" in n]
+    assert moved and "Milk" in moved[0] and "bread" in moved[0] and "one Zepto delivery costs" in moved[0]
+    assert not any(n.startswith("Milk") and "isn't in stock" in n for n in card.notes)
 
 
 def test_checkout_pays_inside_mandate_and_asks_pin_elsewhere():

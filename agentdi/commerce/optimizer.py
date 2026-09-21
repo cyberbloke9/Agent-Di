@@ -82,8 +82,15 @@ def optimize(
         if stores not in best_by_stores or key < best_by_stores[stores][0]:
             best_by_stores[stores] = (key, tuple(choice))
 
-    ranked = sorted(best_by_stores.values(), key=lambda kc: kc[0])[: config.max_plans]
-    return [_build_plan(choice, present, items, missing, registry) for _, choice in ranked]
+    ranked = sorted(best_by_stores.values(), key=lambda kc: kc[0])
+    top = ranked[: config.max_plans]
+    pref = config.preferred_store
+    if pref and not any(pref in {o.store_id for o in choice} for _, choice in top):
+        # Always offer the best cart that keeps the user's own store, so they can compare.
+        keep = next((kc for kc in ranked if pref in {o.store_id for o in kc[1]}), None)
+        if keep is not None:
+            top.append(keep)
+    return [_build_plan(choice, present, items, missing, registry) for _, choice in top]
 
 
 def _subset_assignments(present: list[int], options: list[list[Offer]]):

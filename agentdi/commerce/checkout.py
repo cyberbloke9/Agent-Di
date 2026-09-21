@@ -32,20 +32,49 @@ class ApprovalCard(BaseModel):
     notes: tuple[str, ...]
 
 
+def _cap(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
+def _join(parts: list[str]) -> str:
+    return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
+
+
 def build_approval_card(
     outcome: PlanOutcome, registry: MerchantRegistry, preferred_store: str | None = None, plan_index: int = 0
 ) -> ApprovalCard:
     plan = outcome.plans[plan_index]
     names = {m.id: m.display_name for m in registry.all()}
-    lines, notes = [], []
+    at_preferred = {s.item for s in outcome.searches if s.store_id == preferred_store and s.matches > 0}
+    lines: list[str] = []
+    notes: list[str] = []
+    moved: dict[str, list[str]] = {}
     for basket in plan.baskets:
         store = names[basket.store_id]
         for line in basket.lines:
             lines.append(f"{store} · {line.offer.title} × {line.item.qty} · {line.cost}")
             if preferred_store and basket.store_id != preferred_store:
-                notes.append(f"{line.item.label()} wasn't available at {names[preferred_store]}, so it comes from {store}.")
+                if line.item in at_preferred:
+                    moved.setdefault(store, []).append(line.item.label())
+                else:
+                    notes.append(
+                        f"{_cap(line.item.label())} isn't in stock at {names[preferred_store]}, so it comes from {store}."
+                    )
         fee = "free delivery" if basket.delivery_fee.paise == 0 else f"delivery {basket.delivery_fee}"
         lines.append(f"{store} · {fee}")
+    if moved:
+        pref_name = names[preferred_store]
+        keep = next((p for p in outcome.plans if preferred_store in p.store_ids and p is not plan), None)
+        for store, labels in moved.items():
+            what = _cap(_join(labels))
+            verb = "is" if len(labels) == 1 else "are"
+            if preferred_store in plan.store_ids or keep is None:
+                notes.append(f"{what} {verb} also at {pref_name}, but cheaper at {store}.")
+            else:
+                notes.append(
+                    f"{what} {verb} also at {pref_name}, but one {store} delivery costs {plan.total} "
+                    f"vs {keep.total} splitting with {pref_name}."
+                )
     notes += [f"No connected store has {item.label()}." for item in plan.missing]
     for store_id, url in outcome.handoffs().items():
         notes.append(f"{names[store_id]} has no official API; open it yourself: {url}")
