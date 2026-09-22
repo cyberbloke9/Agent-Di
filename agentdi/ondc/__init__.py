@@ -9,13 +9,29 @@ business number for the sourcing agent, gated as always by the policy engine.
 from agentdi.ondc.beckn import BecknGateway, FakeGateway, SearchIntent
 from agentdi.ondc.catalog import OndcItem, OndcProvider, parse_catalog
 from agentdi.ondc.directory import DirectoryResult, VendorDirectory
+from agentdi.ondc.ordering import (
+    Contact,
+    OrderConfirmation,
+    OrderingAgent,
+    OrderLine,
+    OrderProposal,
+    PaymentAuth,
+    Quote,
+)
 
 __all__ = [
     "BecknGateway",
+    "Contact",
     "DirectoryResult",
     "FakeGateway",
     "OndcItem",
     "OndcProvider",
+    "OrderConfirmation",
+    "OrderLine",
+    "OrderProposal",
+    "OrderingAgent",
+    "PaymentAuth",
+    "Quote",
     "SearchIntent",
     "VendorDirectory",
     "parse_catalog",
