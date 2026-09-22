@@ -45,3 +45,24 @@ Keep the DTO field names aligned with `agentdi/app/dto.py` (or add camelCase
 aliases in the wrapper). The wrapper holds one `AppService` per authenticated
 user session; nothing about the money path changes — it is still the policy
 engine plus the user's PIN.
+
+## The FastAPI wrapper (built)
+`agentdi/app/api.py` provides `create_app(authenticate, build_service, on_vip_summary=None)`:
+- `authenticate(token) -> user_id | None` — you supply real session-token checking.
+- `build_service(user_id) -> AppService` — you supply the user's own billers and
+  live gateways.
+- Responses are camelCase (`upiUri`, `txnRef`) to match the Android client; auth
+  is `Authorization: Bearer <token>`; endpoints are `/handle`, `/settle`,
+  `/notifications/vip`, `/healthz`.
+
+```bash
+pip install -e ".[api]"
+python -m agentdi.app.server        # a DEMO server: one dev token, fake billers, no real payment
+# curl -s localhost:8000/handle -H 'Authorization: Bearer dev-token' \
+#      -H 'Content-Type: application/json' -d '{"utterance":"pay my electricity bill"}'
+```
+
+For production: swap `authenticate`/`build_service` for real ones, run under
+`uvicorn`/`gunicorn`, and move the pending-token state out of the in-memory
+per-user `AppService` into a shared store (Redis) so `settle()` works across
+workers. The money path is unchanged — still the policy engine and the PIN.

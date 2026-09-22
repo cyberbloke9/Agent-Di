@@ -35,7 +35,7 @@ python -m agentdi.bill_demo       # "pay my electricity bill" → fetch → pay 
 | `agentdi/calling` | Declared AI vendor calls to source materials: deterministic RFQ dialogue, policy-gated sourcing agent, ranked quotes; Sarvam ASR/TTS wiring |
 | `agentdi/ondc` | ONDC/Beckn vendor directory + ordering (select/init/confirm): find local sellers, compare offers, order with the user's PIN (seller quotes never auto-debit) |
 | `agentdi/bills` | BBPS bill payments: resolve a saved biller, fetch the bill, pay by PIN (AutoPay is left to the bank; amounts never auto-debit) |
-| `agentdi/app` | The app-service the mobile client calls: approval cards, the UPI hand-off/settle round trip, VIP notification triage |
+| `agentdi/app` | The app-service the mobile client calls (approval cards, UPI hand-off/settle, VIP triage) + a FastAPI wrapper (`api.py`) and demo server (`server.py`) |
 | `android/` | The Kotlin frontend (approval-card UI, UPI intent hand-off, WhatsApp NotificationListener) — real source, built with the Android SDK |
 | `agentdi/privacy.py` | Train-eligibility gate: user's own, opted-in, non-sensitive data only |
 
@@ -53,6 +53,6 @@ resolutions are in `docs/audit-2026-09.md`.
 2. Build the CPaaS-backed `CallTransport` (Plivo/Exotel media + Sarvam ASR/TTS) so the sourcing agent places real calls — see `docs/voice-telephony.md`.
 3. Pin the Zepto adapter against the live server (`docs/zepto-integration.md`), then BBPS.
 4. Wire the planner to a live Sarvam/vLLM endpoint (`docs/planner.md`).
-5. Expose `agentdi/app` over HTTP (see `docs/app.md`) and build the Android module in `android/` (Gradle + Android SDK).
+5. Deploy the app-service (`pip install -e ".[api]"; python -m agentdi.app.server` is a demo; wire real auth + gateways per `docs/app.md`) and build the Android module in `android/` (Gradle + Android SDK).
 
 See the build map in the audit for which open model each feature uses.
