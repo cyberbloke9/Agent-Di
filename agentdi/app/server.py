@@ -52,12 +52,26 @@ def _planner() -> Planner:
     return Planner(FakeLLM(_DEMO_PLANNER))
 
 
+def _shopper():
+    """A live Zepto-backed cross-store shopper when ZEPTO_ACCESS_TOKEN is set, so
+    "buy milk and bread" builds a real review cart instead of "connect a store".
+    The token comes from the user's own Zepto OAuth+OTP (see agentdi.commerce.stores
+    .ZeptoAuth / docs/zepto-integration.md). None otherwise. Search-only: no order
+    is placed here."""
+    token = os.environ.get("ZEPTO_ACCESS_TOKEN")
+    if not token:
+        return None
+    from agentdi.commerce.stores import connect_zepto_engine
+
+    return connect_zepto_engine(token)
+
+
 def _build_service(user_id: str) -> AppService:
     # DEMO: a deliberately non-resolvable settlement VPA so tapping "Pay with UPI"
     # exercises the hand-off UI but cannot actually debit. Real bills need a live
     # BBPS gateway (Setu) and a real settlement account.
     bills = BillPayAgent(FakeBbps(bills=_DEMO_BILLS), settlement_vpa="agentdi.demo@invalid", journal=Journal())
-    return AppService(_planner(), bills, _DEMO_BILLERS, clock=lambda: datetime.now())
+    return AppService(_planner(), bills, _DEMO_BILLERS, clock=lambda: datetime.now(), shopper=_shopper())
 
 
 def _transcriber():

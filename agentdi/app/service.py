@@ -10,15 +10,25 @@ from __future__ import annotations
 
 import re
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime
+from typing import Protocol
 
 from agentdi.app.dto import ActionCard, Authorization, NotificationSummary, PaymentOutcome, PlannedReply, UpiResult
 from agentdi.bills import BillPayAgent, BillerBook, resolve
 from agentdi.bills.billers import Ambiguous, Biller
 from agentdi.bills.bbps import Bill
+from agentdi.commerce.models import CartPlan, ShoppingItem
 from agentdi.planner import PayBillPlan, Planner, ShopPlan, SourcePlan
+from agentdi.planner.compile import shop_plan_to_items
 from agentdi.policy import PolicyContext
+
+
+class Shopper(Protocol):
+    """Builds a cart across connected stores. CrossStoreEngine satisfies this."""
+
+    async def plan(self, items: Sequence[ShoppingItem], config=None) -> object:
+        ...
 
 # A message that looks like an OTP is never surfaced or summarised (defense in depth;
 # Android 15 already hides OTP notifications from listeners).
@@ -39,12 +49,14 @@ class AppService:
         bill_agent: BillPayAgent,
         biller_book: BillerBook,
         clock: Callable[[], datetime] | None = None,
+        shopper: Shopper | None = None,
     ) -> None:
         self._planner = planner
         self._bills = bill_agent
         self._book = biller_book
         self._clock = clock or datetime.now
         self._pending: dict[str, _PendingBill] = {}
+        self._shopper = shopper
 
     def _ctx(self) -> PolicyContext:
         return PolicyContext(now=self._clock())
@@ -54,8 +66,11 @@ class AppService:
         if isinstance(plan, PayBillPlan):
             return await self._handle_bill(plan)
         if isinstance(plan, ShopPlan):
-            names = ", ".join(i.name for i in plan.items)
-            return PlannedReply(kind="shop", message=f"Shopping list: {names}. Connect a store to build a cart.")
+            if self._shopper is None:
+                names = ", ".join(i.name for i in plan.items)
+                return PlannedReply(kind="shop", message=f"Shopping list: {names}. Connect a store to build a cart.")
+            outcome = await self._shopper.plan(shop_plan_to_items(plan))
+            return _shop_reply(outcome)
         if isinstance(plan, SourcePlan):
             return PlannedReply(kind="source", message=f"Sourcing '{plan.product}'. I'll find vendors and get quotes.")
         return PlannedReply(kind=plan.kind, message="I couldn't turn that into an action. Could you rephrase?")
@@ -122,6 +137,43 @@ def _bill_card(token: str, biller: Biller, bill: Bill, proposal) -> ActionCard:
         authorization=Authorization.UPI_PIN,
         upi_uri=proposal.upi_intent.uri() if proposal.upi_intent else None,
         notes=tuple(proposal.decision.reasons) if proposal.decision else (),
+    )
+
+
+def _shop_reply(outcome) -> PlannedReply:
+    """Turn a cross-store PlanOutcome into a review-cart card. Ordering is not done
+    here — placing a Zepto order spends real money through Zepto's own checkout —
+    so the card is informational (Authorization.NONE): it shows the best cart the
+    agent found for the user to review and place. Store prices are partner data,
+    shown for the user, never used to authorise a payment."""
+    plans = getattr(outcome, "plans", ())
+    best: CartPlan | None = plans[0] if plans else None
+    if best is None or not best.baskets:
+        handoffs = outcome.handoffs() if hasattr(outcome, "handoffs") else {}
+        notes = tuple(f"Open {sid} to shop it yourself." for sid, url in handoffs.items())
+        return PlannedReply(kind="shop", message="I couldn't find those items at the connected store right now.",
+                            card=None if not notes else ActionCard(
+                                token=uuid.uuid4().hex, title="Nothing to add", lines=(), total=None,
+                                authorization=Authorization.NONE, upi_uri=None, notes=notes))
+
+    lines: list[str] = []
+    for basket in best.baskets:
+        for bl in basket.lines:
+            qty = f"{bl.item.qty}× " if bl.item.qty > 1 else ""
+            lines.append(f"{qty}{bl.offer.title} — {bl.offer.price}")
+        if basket.delivery_fee.paise:
+            lines.append(f"Delivery: {basket.delivery_fee}")
+    notes = ["Review-only: placing the order spends real money — open the store's app to check out."]
+    eta = max((b.eta_minutes for b in best.baskets if b.eta_minutes is not None), default=None)
+    if eta is not None:
+        notes.insert(0, f"ETA ~{eta} min")
+    if best.missing:
+        notes.append("Not found: " + ", ".join(i.name for i in best.missing))
+    return PlannedReply(
+        kind="shop",
+        message=f"Cart ready to review — {best.total}.",
+        card=ActionCard(token=uuid.uuid4().hex, title="Review cart", lines=tuple(lines),
+                        total=str(best.total), authorization=Authorization.NONE, upi_uri=None, notes=tuple(notes)),
     )
 
 
