@@ -41,9 +41,23 @@ def _authenticate(token: str) -> str | None:
     return "dev-user" if token == DEV_TOKEN else None
 
 
+def _planner() -> Planner:
+    """Use the real Sarvam planner when SARVAM_API_KEY is set (understands
+    Telugu/Hindi/English); otherwise a scripted fake so the server still runs."""
+    key = os.environ.get("SARVAM_API_KEY")
+    if key:
+        from agentdi.planner import OpenAICompatLLM
+
+        return Planner(OpenAICompatLLM("https://api.sarvam.ai/v1", key, "sarvam-105b"))
+    return Planner(FakeLLM(_DEMO_PLANNER))
+
+
 def _build_service(user_id: str) -> AppService:
-    bills = BillPayAgent(FakeBbps(bills=_DEMO_BILLS), settlement_vpa="agentdi-bbps@icici", journal=Journal())
-    return AppService(Planner(FakeLLM(_DEMO_PLANNER)), bills, _DEMO_BILLERS, clock=lambda: datetime.now())
+    # DEMO: a deliberately non-resolvable settlement VPA so tapping "Pay with UPI"
+    # exercises the hand-off UI but cannot actually debit. Real bills need a live
+    # BBPS gateway (Setu) and a real settlement account.
+    bills = BillPayAgent(FakeBbps(bills=_DEMO_BILLS), settlement_vpa="agentdi.demo@invalid", journal=Journal())
+    return AppService(_planner(), bills, _DEMO_BILLERS, clock=lambda: datetime.now())
 
 
 app = create_app(_authenticate, _build_service)
@@ -52,4 +66,5 @@ app = create_app(_authenticate, _build_service)
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("PORT", "8000")))
+    # 0.0.0.0 so a USB device (via `adb reverse tcp:8000 tcp:8000`) or the LAN can reach it.
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))

@@ -1,13 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.agentdi.app">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:label="Agent-Di"
-        android:theme="@style/Theme.Material3.DayNight">
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AgentDi"
+        android:usesCleartextTraffic="true">
+        <!--
+          usesCleartextTraffic is for the DEV setup only (http://localhost via
+          `adb reverse`). Remove it (or restrict with a network-security-config)
+          before any release build.
+        -->
 
         <activity
             android:name=".MainActivity"
@@ -22,9 +29,9 @@
           Reads incoming notifications so it can surface messages from the people
           the user marks important. The user must turn this on in system settings
           (Settings > Notifications > Notification access). Non-VIP and OTP-like
-          messages are filtered ON DEVICE and never leave the phone (see
-          NotificationTriage). A prominent in-app disclosure + consent must precede
-          enabling this, per Google Play's User Data policy.
+          messages are filtered ON DEVICE (NotificationTriage) and never leave the
+          phone. A prominent in-app disclosure + consent must precede enabling
+          this, per Google Play's User Data policy.
         -->
         <service
             android:name=".notifications.VipNotificationListener"

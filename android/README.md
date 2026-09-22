@@ -32,10 +32,48 @@ ever sent by the user tapping WhatsApp's own reply action.
   user is sent to enable it (Google Play User Data policy). Non-VIP and OTP-like
   messages are dropped in `NotificationTriage` and never leave the phone.
 
-## To build (later)
-1. Add a Gradle module with Compose, `androidx.activity`, OkHttp, and
-   `kotlinx.serialization` (versions per your catalog; see the memory notes on
-   this machine's CMP/Compose setup).
-2. Point `AgentClient(baseUrl, authToken)` at the app-service HTTP endpoint
-   (see `docs/app.md` for the contract).
-3. Wire `VipStore`/`AgentBridge` to DataStore + a background scope.
+## Build & test on a device (Moto G05, Android 15)
+The Gradle project is set up (compileSdk/targetSdk 35, minSdk 26, Compose).
+
+### 1. Run the backend on the desktop (with your live Sarvam key)
+```bash
+cd <repo root>
+pip install -e ".[api,live]"
+setx SARVAM_API_KEY "your-sarvam-key"      # PowerShell: $env:SARVAM_API_KEY="..."
+python -m agentdi.app.server               # serves on 0.0.0.0:8000, dev token "dev-token"
+```
+It uses the real Sarvam planner when `SARVAM_API_KEY` is set (Telugu/Hindi/English).
+Bills run on a **fake** BBPS gateway with a **non-payable** settlement VPA, so the
+UPI hand-off exercises the flow but cannot debit. (Real bills need a Setu key.)
+
+### 2. Let the phone reach the desktop
+Plug in the phone (USB debugging on), then:
+```bash
+adb devices                      # confirm the G05 is listed
+adb reverse tcp:8000 tcp:8000    # phone's localhost:8000 -> desktop server
+```
+`Config.BASE_URL` is `http://localhost:8000`; for Wi-Fi instead, set it to the
+desktop's LAN IP.
+
+### 3. Build & install
+Open the `android/` folder in **Android Studio** (it generates the Gradle wrapper
+and writes `local.properties` with your SDK path on first sync), then **Run 'app'**
+to the G05. Or from the CLI once the wrapper jar exists:
+```bash
+cd android
+adb install -r app/build/outputs/apk/debug/app-debug.apk   # after ./gradlew assembleDebug
+```
+> The `gradle-wrapper.jar` binary isn't checked in; Android Studio creates it on
+> open, or run `gradle wrapper --gradle-version 8.9` once with a system Gradle.
+
+### 4. Try it
+Type "pay my electricity bill" → an approval card appears → "Pay with UPI" opens
+your UPI app against the **test** VPA (it won't complete — that's expected). Try
+Hindi/Telugu too; the planner understands them. To test the WhatsApp reader,
+enable notification access for the app in system settings.
+
+## Later
+- Wire `VipStore`/`AgentBridge` to DataStore + a background scope (and post VIP
+  summaries via `AgentClient.forwardVipSummary`).
+- Swap the demo backend for real auth, a live Setu BBPS gateway, and a real
+  settlement account before any real payment.
