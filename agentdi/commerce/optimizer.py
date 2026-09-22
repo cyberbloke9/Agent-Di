@@ -3,8 +3,10 @@
 Completeness comes first: a cart that has everything beats a cheaper cart
 that's missing the yogurt. Then total cost, including each store's delivery
 fee (waived above its free-delivery threshold) plus a small penalty for every
-extra delivery to the door. Small carts are solved exactly; big ones fall back
-to trying every subset of stores.
+extra delivery to the door. Small carts are solved exactly and optimally over
+every item-to-store assignment. Very large carts fall back to a bounded
+per-subset heuristic (capped store count, cheapest offer per item per subset):
+it stays complete but may not be cost-optimal.
 """
 
 from __future__ import annotations
@@ -39,6 +41,10 @@ class OptimizerConfig(BaseModel):
     max_exact: int = 50_000
     """Above this many item-to-store assignments, use the subset heuristic."""
 
+    max_stores: int = 10
+    """Cap on stores considered in the subset fallback, so it can't run 2^N. Above
+    this, only the best-covering, cheapest stores are kept (a bounded approximation)."""
+
 
 def _best_per_store(cands: Sequence[Candidate]) -> list[Offer]:
     """For one item, keep the best acceptable offer from each store."""
@@ -72,7 +78,7 @@ def optimize(
     assignments = (
         product(*(options[i] for i in present))
         if space <= config.max_exact
-        else _subset_assignments(present, options)
+        else _subset_assignments(present, options, config.max_stores)
     )
 
     best_by_stores: dict[frozenset[str], tuple[tuple, tuple[Offer, ...]]] = {}
@@ -93,9 +99,24 @@ def optimize(
     return [_build_plan(choice, present, items, missing, registry) for _, choice in top]
 
 
-def _subset_assignments(present: list[int], options: list[list[Offer]]):
+def _rank_stores(present: list[int], options: list[list[Offer]], keep: int) -> list[str]:
+    """Keep the `keep` stores that cover the most items, cheapest first — a bounded
+    approximation so the subset search can't run 2^N over an unbounded store count."""
+    coverage: dict[str, int] = defaultdict(int)
+    cheapest: dict[str, int] = defaultdict(int)
+    for i in present:
+        for o in options[i]:
+            coverage[o.store_id] += 1
+            cheapest[o.store_id] += o.price.paise
+    stores = sorted(coverage, key=lambda s: (-coverage[s], cheapest[s], s))
+    return stores[:keep]
+
+
+def _subset_assignments(present: list[int], options: list[list[Offer]], max_stores: int):
     """For each subset of stores, the cheapest offer per item within that subset."""
     stores = sorted({o.store_id for i in present for o in options[i]})
+    if len(stores) > max_stores:
+        stores = sorted(_rank_stores(present, options, max_stores))
     for r in range(1, len(stores) + 1):
         for subset in combinations(stores, r):
             allowed = set(subset)

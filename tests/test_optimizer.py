@@ -66,6 +66,22 @@ def test_zero_score_offers_are_ignored():
     assert optimize([MILK], cands, REG)[0].store_ids == ("ondc",)
 
 
+def test_fallback_is_bounded_over_many_stores():
+    # Many stores + forced fallback must not run 2^N; it completes fast and stays complete.
+    import time
+
+    n = 30
+    reg = MerchantRegistry(
+        [Merchant(id=f"s{k}", display_name=f"S{k}", vpa=f"s{k}@x", access=Access.ONDC, delivery_fee=R(20)) for k in range(n)]
+    )
+    items = [ShoppingItem(name=f"item{i}") for i in range(4)]
+    cands = [[(Offer(store_id=f"s{k}", sku_id=f"{k}:{i}", title=f"item{i}", price=R(40 + (k + i) % 7)), 1.0) for k in range(n)] for i in range(4)]
+    t0 = time.perf_counter()
+    plan = optimize(items, cands, reg, OptimizerConfig(max_exact=1, max_stores=8))[0]
+    assert plan.complete
+    assert time.perf_counter() - t0 < 2.0  # bounded, not 2^30
+
+
 def test_subset_heuristic_for_large_carts():
     items = [ShoppingItem(name=f"item{i}") for i in range(6)]
     cands = [[(o("blinkit", f"a{i}", 50), 1.0), (o("zepto", f"b{i}", 55), 1.0), (o("ondc", f"c{i}", 45), 1.0)] for i in range(6)]
