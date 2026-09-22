@@ -131,7 +131,10 @@ class Checkout:
                 counterparty=merchant.as_counterparty(),
                 counterparty_source=Source.SYSTEM,
                 amount=basket.total,
-                amount_source=Source.PARTNER_API,
+                # The user approved this exact total on the approval card, so it is a
+                # user-trusted amount. A raw store/catalogue price (PARTNER_API) is never
+                # trusted for a silent debit; only the approved total is.
+                amount_source=Source.USER,
                 category=category,
                 channel=channel,
             )

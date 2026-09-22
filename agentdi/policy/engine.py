@@ -15,6 +15,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict
 
 from agentdi.core import (
+    TRUSTED_FOR_AMOUNT,
     TRUSTED_FOR_PAYEE,
     ActionKind,
     Channel,
@@ -173,8 +174,8 @@ class PolicyEngine:
             reasons.append(
                 f"The payee came from {intent.counterparty_source.value} content, so you confirm it with your PIN."
             )
-        if intent.amount_source is Source.UNTRUSTED:
-            reasons.append("The amount came from untrusted text, so you confirm it with your PIN.")
+        if intent.amount_source not in TRUSTED_FOR_AMOUNT:
+            reasons.append("The amount isn't one you approved, so you confirm it with your PIN.")
         if intent.channel is not Channel.APP:
             reasons.append(f"Money only moves from the app on your own phone, never over {intent.channel.value}.")
         if payee.id not in ctx.known_merchants:

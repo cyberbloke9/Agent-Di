@@ -42,12 +42,14 @@ def ctx(**kw) -> PolicyContext:
 
 
 def order(amount: str | None = "420", **kw) -> Intent:
+    # A real order: payee from our registry (SYSTEM), amount approved on the card (USER).
     base = dict(
         kind=ActionKind.PLACE_ORDER,
         description="Groceries",
         counterparty=ZEPTO,
+        counterparty_source=Source.SYSTEM,
         amount=None if amount is None else Money.rupees(amount),
-        amount_source=Source.PARTNER_API,
+        amount_source=Source.USER,
         category="groceries",
     )
     base.update(kw)
@@ -101,6 +103,21 @@ def test_untrusted_payee_forces_pin_even_inside_mandate():
 
 def test_untrusted_amount_forces_pin():
     d = engine.evaluate(order(amount_source=Source.UNTRUSTED), ctx())
+    assert d.verdict is Verdict.CONFIRM and d.auth is Auth.UPI_PIN
+
+
+def test_raw_partner_price_never_auto_debits():
+    # A price straight off a store's catalogue (PARTNER_API) is not user-approved,
+    # so it must force a PIN even inside a mandate (H2: a compromised store can't
+    # set a silent debit amount).
+    d = engine.evaluate(order(amount_source=Source.PARTNER_API), ctx())
+    assert d.verdict is Verdict.CONFIRM and d.auth is Auth.UPI_PIN
+
+
+def test_intent_defaults_are_fail_closed():
+    # An intent built without provenance (planner forgot) must not auto-move money (H1).
+    forgot = Intent(kind=ActionKind.PAY, description="pay", counterparty=ZEPTO, amount=Money.rupees("420"))
+    d = engine.evaluate(forgot, ctx())
     assert d.verdict is Verdict.CONFIRM and d.auth is Auth.UPI_PIN
 
 
@@ -168,7 +185,14 @@ def test_messages_always_need_a_tap():
 
 
 def call(counterparty=CLINIC, **kw) -> Intent:
+    kw.setdefault("counterparty_source", Source.SYSTEM)  # number from the user's saved vendor / registry
     return Intent(kind=ActionKind.PLACE_CALL, description="Book appointment", counterparty=counterparty, **kw)
+
+
+def test_call_with_default_provenance_is_not_auto_dialed():
+    # A call intent with no provenance set must not auto-dial (H1 fail-closed).
+    forgot = Intent(kind=ActionKind.PLACE_CALL, description="call", counterparty=CLINIC)
+    assert engine.evaluate(forgot, ctx()).verdict is Verdict.CONFIRM
 
 
 def test_call_to_listed_business_is_allowed():

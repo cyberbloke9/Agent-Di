@@ -26,6 +26,11 @@ class Source(StrEnum):
 TRUSTED_FOR_PAYEE: frozenset[Source] = frozenset({Source.USER, Source.SYSTEM})
 """Only these sources may name a payee or a message recipient without a confirmation."""
 
+TRUSTED_FOR_AMOUNT: frozenset[Source] = frozenset({Source.USER, Source.SYSTEM})
+"""Only a user-approved amount or our own computed amount may auto-debit inside a mandate.
+A raw partner/catalogue price (PARTNER_API) or untrusted text always forces a PIN, so a
+compromised store can never set a silent debit amount."""
+
 
 class Channel(StrEnum):
     APP = "app"

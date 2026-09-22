@@ -83,9 +83,12 @@ class Intent(BaseModel):
     kind: ActionKind
     description: str
     counterparty: Counterparty | None = None
-    counterparty_source: Source = Source.SYSTEM
+    # Provenance defaults are fail-closed: an intent built from text the planner forgot to
+    # tag is treated as UNTRUSTED, so it can never silently move money. Trusted paths (the
+    # merchant registry, the user's approval) set SYSTEM/USER explicitly.
+    counterparty_source: Source = Source.UNTRUSTED
     amount: Money | None = None
-    amount_source: Source = Source.SYSTEM
+    amount_source: Source = Source.UNTRUSTED
     category: str | None = None
     channel: Channel = Channel.APP
     platform: str | None = None
