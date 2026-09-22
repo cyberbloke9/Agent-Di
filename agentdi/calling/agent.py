@@ -68,6 +68,7 @@ class SourcingAgent:
         lang: str = "en",
         extra_questions: tuple[str, ...] = (),
         max_price: float | None = None,
+        vendor_source: Source = Source.SYSTEM,
     ) -> RfqResult:
         brief = CallBrief(
             company_name=self._company, user_name=user_name, product=product, specs=specs,
@@ -81,7 +82,11 @@ class SourcingAgent:
                 kind=ActionKind.PLACE_CALL,
                 description=f"Source {product} from {vendor.display_name}",
                 counterparty=vendor,
-                counterparty_source=Source.SYSTEM,
+                # The user's own saved vendors are SYSTEM; vendors from ONDC's
+                # network come as PARTNER_API. Both are listed businesses, so the
+                # policy engine allows a disclosed, capped call; neither is
+                # untrusted free text.
+                counterparty_source=vendor_source,
                 channel=Channel.APP,
             )
             decision = self._policy.evaluate(intent, ctx)
