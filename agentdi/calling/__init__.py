@@ -14,6 +14,15 @@ from agentdi.calling.driver import run_rfq_call
 from agentdi.calling.interfaces import ASR, CallTransport, TTS, Transcript
 from agentdi.calling.media import MediaCallTransport, MediaChannel
 from agentdi.calling.outcome import Slot, VendorQuote
+from agentdi.calling.plivo import (
+    PlivoMediaChannel,
+    PlivoMediaSocket,
+    PlivoRestClient,
+    PlivoStreamRegistry,
+    PlivoTransportFactory,
+    VadConfig,
+    answer_xml,
+)
 
 __all__ = [
     "ASR",
@@ -22,11 +31,18 @@ __all__ = [
     "DialogueStep",
     "MediaCallTransport",
     "MediaChannel",
+    "PlivoMediaChannel",
+    "PlivoMediaSocket",
+    "PlivoRestClient",
+    "PlivoStreamRegistry",
+    "PlivoTransportFactory",
     "RfqDialogue",
     "Slot",
     "TTS",
     "Transcript",
+    "VadConfig",
     "VendorQuote",
+    "answer_xml",
     "disclosure",
     "run_rfq_call",
 ]
