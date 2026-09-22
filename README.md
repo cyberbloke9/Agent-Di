@@ -13,7 +13,7 @@ Design and research: [Instinct India Audit](https://claude.ai/artifact/L2FtVw8Gu
 ## Try it
 ```bash
 pip install -e ".[dev]"
-pytest -q                 # 71 tests
+pytest -q                 # 121 tests
 python -m agentdi.demo    # "Epigamia is out at Blinkit" → one Zepto cart, paid inside your mandate
 ```
 
@@ -22,17 +22,26 @@ python -m agentdi.demo    # "Epigamia is out at Blinkit" → one Zepto cart, pai
 |---|---|
 | `agentdi/core` | Money in paise, value provenance (user / system / partner API / untrusted), typed intents |
 | `agentdi/policy` | Deterministic policy engine, spending mandates with NPCI rail limits, call caps |
-| `agentdi/journal.py` | Hash-chained action journal that refuses to store PINs, OTPs or card numbers |
-| `agentdi/commerce` | Product matching (Hindi/Telugu grocery words), parallel cross-store search, cart optimiser, approval card, checkout |
+| `agentdi/journal.py` | Integrity-chained action journal (optional keyed HMAC) that refuses to store PINs, OTPs or card numbers |
+| `agentdi/commerce` | Product matching (Hindi/Telugu incl. native script), parallel cross-store search, cart optimiser, approval card, checkout |
+| `agentdi/commerce/stores/zepto.py` | Zepto adapter over its official MCP server (search-only; see `docs/zepto-integration.md`) |
+| `agentdi/mcp` | Minimal MCP client (streamable HTTP) for reaching stores' MCP servers |
 | `agentdi/payments` | UPI intent links; refuses payees from untrusted text |
+| `agentdi/privacy.py` | Train-eligibility gate: user's own, opted-in, non-sensitive data only |
 
 All stores in the demo are **simulated**. No real store, payment or call is made yet.
 
+## Security & testing
+121 tests, including an adversarial policy battery and MCP hostile-input cases.
+The money path is fail-closed: only the deterministic policy engine authorises a
+payment, untrusted-sourced payees/amounts always force the user's PIN, and the
+PIN never leaves the user's phone. A four-agent security/QA audit and its
+resolutions are in `docs/audit-2026-09.md`.
+
 ## Next
-1. First live store: Zepto's official MCP adapter.
-2. ONDC buyer adapter and BBPS bill payments through a payment aggregator.
-3. Planner on `sarvamai/sarvam-30b`: turn "milk, bread, Epigamia" (Telugu, Hindi or English) into typed intents.
-4. Android app: approval card, UPI hand-off, notification reader for WhatsApp VIPs.
-5. Voice: IndicConformer + Indic Parler-TTS, then the declared calling agent.
+1. Pin the Zepto adapter against the live server (see `docs/zepto-integration.md`), then ONDC + BBPS.
+2. Planner on `sarvamai/sarvam-30b`: turn "milk, bread, Epigamia" (Telugu, Hindi or English) into typed intents.
+3. Android app: approval card, UPI hand-off, notification reader for WhatsApp VIPs.
+4. Voice: IndicConformer + Indic Parler-TTS, then the declared calling agent.
 
 See the build map in the audit for which open model each feature uses.
