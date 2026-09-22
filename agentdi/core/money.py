@@ -23,14 +23,19 @@ class Money(BaseModel):
 
     @classmethod
     def rupees(cls, value: int | str | Decimal) -> Money:
-        """Build from a rupee amount, e.g. Money.rupees("49.50"). Floats are refused on purpose."""
-        if isinstance(value, float):
-            raise TypeError("Pass rupees as int, str or Decimal, never float")
+        """Build from a rupee amount, e.g. Money.rupees("49.50"). Floats and bools are refused."""
+        if isinstance(value, bool) or isinstance(value, float):
+            raise TypeError("Pass rupees as int, str or Decimal, never float or bool")
         try:
             amount = Decimal(value)
         except InvalidOperation as exc:
             raise ValueError(f"Not a rupee amount: {value!r}") from exc
-        paise = (amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        if not amount.is_finite():
+            raise ValueError(f"Not a finite rupee amount: {value!r}")
+        try:
+            paise = (amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        except (InvalidOperation, OverflowError) as exc:
+            raise ValueError(f"Rupee amount out of range: {value!r}") from exc
         return cls(paise=int(paise))
 
     @classmethod
@@ -44,7 +49,7 @@ class Money(BaseModel):
         return Money(paise=self.paise - other.paise)
 
     def __mul__(self, quantity: int) -> Money:
-        if not isinstance(quantity, int):
+        if isinstance(quantity, bool) or not isinstance(quantity, int):
             raise TypeError("Money can only be multiplied by a whole quantity")
         return Money(paise=self.paise * quantity)
 

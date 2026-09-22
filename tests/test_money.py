@@ -14,6 +14,19 @@ def test_float_refused():
         Money.rupees(49.5)
 
 
+def test_bool_refused():
+    with pytest.raises(TypeError):
+        Money.rupees(True)
+    with pytest.raises(TypeError):
+        Money.rupees(1) * True
+
+
+@pytest.mark.parametrize("bad", ["Infinity", "-Infinity", "NaN", "1e1000"])
+def test_non_finite_and_out_of_range_refused(bad):
+    with pytest.raises(ValueError):
+        Money.rupees(bad)
+
+
 def test_negative_refused():
     with pytest.raises(ValueError):
         Money(paise=-1)

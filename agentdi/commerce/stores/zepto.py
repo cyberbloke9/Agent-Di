@@ -117,9 +117,12 @@ class ZeptoStore:
     def _to_money(self, value: Any) -> Money | None:
         try:
             if self._profile.price_in_paise:
-                return Money(paise=int(Decimal(str(value))))
+                d = Decimal(str(value))
+                if not d.is_finite():
+                    return None
+                return Money(paise=int(d))
             return Money.rupees(_clean_amount(value))
-        except (ValueError, InvalidOperation, TypeError):
+        except (ValueError, InvalidOperation, TypeError, OverflowError):
             return None
 
 
@@ -149,8 +152,9 @@ def _to_bool(value: Any) -> bool:
 
 def _to_int(value: Any) -> int | None:
     try:
-        return int(Decimal(str(value)))
-    except (ValueError, InvalidOperation, TypeError):
+        d = Decimal(str(value))
+        return int(d) if d.is_finite() else None
+    except (ValueError, InvalidOperation, TypeError, OverflowError):
         return None
 
 

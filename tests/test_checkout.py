@@ -83,3 +83,15 @@ def test_upi_intent_format_and_guards():
     with pytest.raises(ValueError):
         build_upi_intent("not a vpa", "x", Money.rupees(10), "r1", "x", Source.SYSTEM)
     assert len(build_upi_intent("shop@okaxis", "x", Money.rupees(1), "r", "n" * 80, Source.SYSTEM).note) == 50
+
+
+def test_upi_model_refuses_param_injection_in_ref():
+    from agentdi.payments import UpiIntent
+
+    # A directly-constructed intent with a malicious ref must be rejected, so uri()
+    # can never carry a second &am=/&pa= that overrides the amount or payee (M1).
+    with pytest.raises(ValueError):
+        UpiIntent(payee_vpa="shop@okaxis", payee_name="Shop", amount=Money.rupees(1),
+                  txn_ref="X&am=99999&pa=attacker@evil", note="hi")
+    with pytest.raises(ValueError):
+        UpiIntent(payee_vpa="attacker@evil evil", payee_name="Shop", amount=Money.rupees(1), txn_ref="r1", note="hi")
