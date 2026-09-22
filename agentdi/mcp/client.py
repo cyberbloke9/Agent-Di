@@ -103,6 +103,9 @@ class MCPClient:
     async def _call(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         payload = {"jsonrpc": "2.0", "id": next(self._ids), "method": method, "params": params}
         response = await self._t.request(payload)
+        resp_id = response.get("id")
+        if resp_id is not None and resp_id != payload["id"]:
+            raise MCPError(0, f"response id {resp_id!r} does not match request id {payload['id']!r}")
         if "error" in response:
             err = response["error"]
             raise MCPError(err.get("code", 0), err.get("message", ""), err.get("data"))

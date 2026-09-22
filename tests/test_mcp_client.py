@@ -78,3 +78,51 @@ def test_sse_body_parsing():
         'data: {"jsonrpc":"2.0","id":7,"result":{"tools":[]}}\n\n'
     )
     assert _first_json_rpc(multi, want_id=7)["result"] == {"tools": []}
+
+
+def test_sse_crlf_multi_event_body():
+    # Real servers send a progress/ping frame then the result, CRLF-separated.
+    body = (
+        'event: message\r\n'
+        'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{}}\r\n'
+        '\r\n'
+        'event: message\r\n'
+        'data: {"jsonrpc":"2.0","id":5,"result":{"tools":[{"name":"search"}]}}\r\n'
+        '\r\n'
+    )
+    got = _first_json_rpc(body, want_id=5)
+    assert got["result"]["tools"][0]["name"] == "search"
+
+
+def test_sse_multiline_data_joined():
+    body = 'data: {"jsonrpc":"2.0","id":2,\ndata: "result":{"ok":true}}\n\n'
+    assert _first_json_rpc(body, want_id=2)["result"] == {"ok": True}
+
+
+class _IdFlippingTransport:
+    """Passes initialize through, but corrupts the id on tools/list responses."""
+
+    def __init__(self, server):
+        self._server = server
+        self.closed = False
+
+    async def request(self, payload):
+        resp = self._server.handle(payload)
+        if payload.get("method") == "tools/list" and resp.get("id") is not None:
+            resp = {**resp, "id": resp["id"] + 1000}
+        return resp
+
+    async def notify(self, payload):
+        self._server.handle(payload)
+
+    async def aclose(self):
+        self.closed = True
+
+
+def test_response_id_mismatch_is_rejected():
+    # A hostile server steering the client onto a response it didn't ask for.
+    server = MockMCPServer(TOOLS, {})
+    client = MCPClient(_IdFlippingTransport(server))
+    run(client.initialize())  # unaffected
+    with pytest.raises(MCPError, match="does not match request id"):
+        run(client.list_tools())

@@ -86,14 +86,15 @@ class CrossStoreEngine:
 
         try:
             raw = await asyncio.wait_for(adapter.search(item), timeout=self.timeout_s)
+            # A store can only list its own products; drop non-Offers and anything
+            # claiming another store's id. Mapping runs inside the try so a malformed
+            # adapter return is recorded, not propagated through gather to kill the plan.
+            own = [o for o in raw if isinstance(o, Offer) and o.store_id == adapter.merchant_id]
+            matches = sum(1 for o in own if self.matcher.score(item, o) > 0)
+            return done(own, matches=matches)
         except NoOfficialApi as exc:
             return done([], error=str(exc), handoff=exc.deep_link)
         except TimeoutError:
             return done([], error=f"timed out after {self.timeout_s:g}s")
         except Exception as exc:  # one broken store must never sink the whole order
             return done([], error=f"{type(exc).__name__}: {exc}")
-
-        # A store can only list its own products; drop anything claiming another store's id.
-        own = [o for o in raw if o.store_id == adapter.merchant_id]
-        matches = sum(1 for o in own if self.matcher.score(item, o) > 0)
-        return done(own, matches=matches)

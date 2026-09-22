@@ -81,6 +81,21 @@ def test_broken_store_is_recorded_not_fatal():
     assert any(s.error and "503" in s.error for s in outcome.searches)
 
 
+class _MalformedStore:
+    merchant_id = "blinkit"
+
+    async def search(self, item):
+        return ["not an offer", {"also": "wrong"}, None]  # adapter returns junk
+
+
+def test_malformed_adapter_output_does_not_sink_the_plan():
+    engine = CrossStoreEngine([_MalformedStore(), SimulatedStore("zepto", ZEPTO)], REG)
+    outcome = run(engine.plan(ITEMS[:1] + ITEMS[2:]))
+    assert outcome.best.complete and outcome.best.store_ids == ("zepto",)
+    blinkit = next(s for s in outcome.searches if s.store_id == "blinkit")
+    assert blinkit.offers_found == 0  # junk dropped, no crash
+
+
 def test_listings_claiming_another_store_are_dropped():
     spoof = [offer("blinkit", "Epigamia Greek Yogurt Natural 400 g", 1, "Epigamia", "400 g")]
     engine = CrossStoreEngine([SimulatedStore("zepto", ZEPTO + spoof)], REG)

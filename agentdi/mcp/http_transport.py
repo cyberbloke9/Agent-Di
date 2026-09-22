@@ -8,11 +8,14 @@ only here; everything else is tested against InMemoryTransport.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import httpx
 
 ACCEPT = "application/json, text/event-stream"
+MAX_BODY_BYTES = 8 * 1024 * 1024
+_FRAME_SPLIT = re.compile(r"\r?\n\r?\n")
 
 
 class StreamableHttpTransport:
@@ -32,6 +35,8 @@ class StreamableHttpTransport:
     async def request(self, payload: dict[str, Any]) -> dict[str, Any]:
         resp = await self._client.post(self._url, headers=self._headers(), content=json.dumps(payload))
         resp.raise_for_status()
+        if len(resp.content) > MAX_BODY_BYTES:
+            raise ValueError(f"MCP response exceeds {MAX_BODY_BYTES} bytes")
         if (sid := resp.headers.get("Mcp-Session-Id")):
             self._session_id = sid
         ctype = resp.headers.get("Content-Type", "")
@@ -55,12 +60,17 @@ class StreamableHttpTransport:
 
 
 def _first_json_rpc(body: str, want_id: Any) -> dict[str, Any]:
-    """Pull the JSON-RPC object matching want_id out of an SSE body."""
+    """Pull the JSON-RPC object matching want_id out of an SSE body.
+
+    Frames are separated by a blank line (LF or CRLF); multiple `data:` lines
+    in one frame join with a newline (SSE spec). A frame whose id doesn't match
+    is skipped (it may be a server notification/progress event); we only fall
+    back to an unmatched result when the caller sent no id.
+    """
     fallback: dict[str, Any] | None = None
-    for event in body.split("\n\n"):
-        data = "".join(
-            line[len("data:") :].lstrip() for line in event.splitlines() if line.startswith("data:")
-        )
+    for event in _FRAME_SPLIT.split(body):
+        lines = event.replace("\r\n", "\n").split("\n")
+        data = "\n".join(line[len("data:") :].lstrip() for line in lines if line.startswith("data:"))
         if not data:
             continue
         try:
@@ -70,7 +80,7 @@ def _first_json_rpc(body: str, want_id: Any) -> dict[str, Any]:
         if isinstance(obj, dict):
             if obj.get("id") == want_id:
                 return obj
-            if fallback is None and ("result" in obj or "error" in obj):
+            if want_id is None and fallback is None and ("result" in obj or "error" in obj):
                 fallback = obj
     if fallback is not None:
         return fallback
