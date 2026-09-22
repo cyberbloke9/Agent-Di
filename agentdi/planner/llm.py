@@ -60,9 +60,9 @@ class OpenAICompatLLM:
         self._owns_client = client is None
 
     async def complete(self, system: str, user: str) -> str:
-        import httpx
+        from agentdi.net import async_client
 
-        client = self._client or httpx.AsyncClient(timeout=self._timeout)
+        client = self._client or async_client(self._timeout)
         try:
             resp = await client.post(  # type: ignore[union-attr]
                 self._url,

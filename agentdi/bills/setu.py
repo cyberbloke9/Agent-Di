@@ -76,9 +76,9 @@ class SetuBbps:
         return self._token or ""
 
     async def _post(self, path: str, body: dict[str, Any], auth: bool) -> dict[str, Any]:
-        import httpx
+        from agentdi.net import async_client
 
-        client = self._client or httpx.AsyncClient(timeout=self._timeout)
+        client = self._client or async_client(self._timeout)
         try:
             headers = {"Content-Type": "application/json"}
             if auth:

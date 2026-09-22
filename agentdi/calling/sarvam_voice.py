@@ -33,9 +33,9 @@ class SarvamASR:
         self._owns = client is None
 
     async def transcribe(self, audio: bytes, lang_hint: str | None = None) -> Transcript:
-        import httpx
+        from agentdi.net import async_client
 
-        client = self._client or httpx.AsyncClient(timeout=self._timeout)
+        client = self._client or async_client(self._timeout)
         try:
             data = {"model": self._model}
             if lang_hint:
@@ -69,9 +69,9 @@ class SarvamTTS:
         self._owns = client is None
 
     async def synthesize(self, text: str, lang: str = "en") -> bytes:
-        import httpx
+        from agentdi.net import async_client
 
-        client = self._client or httpx.AsyncClient(timeout=self._timeout)
+        client = self._client or async_client(self._timeout)
         try:
             resp = await client.post(  # type: ignore[union-attr]
                 self._url,
