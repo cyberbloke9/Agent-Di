@@ -37,6 +37,16 @@ def test_approval_card_explains_the_switch():
     assert any("BigBasket has no official API" in n for n in card.notes)
 
 
+def test_timed_out_preferred_store_is_not_called_out_of_stock():
+    # Blinkit (preferred) times out; the card must not claim its items are out of stock.
+    slow = SimulatedStore("blinkit", BLINKIT, latency_s=1.0)
+    engine = CrossStoreEngine([slow, SimulatedStore("zepto", ZEPTO)], REG, timeout_s=0.05)
+    outcome = asyncio.run(engine.plan(ITEMS[:1] + ITEMS[2:], OptimizerConfig(preferred_store="blinkit")))
+    card = build_approval_card(outcome, REG, preferred_store="blinkit")
+    assert any(n.startswith("Couldn't reach Blinkit") for n in card.notes)
+    assert not any("isn't in stock at Blinkit" in n for n in card.notes)
+
+
 def test_items_moved_for_price_are_not_called_unavailable():
     # Zepto also stocks milk and bread and a single Zepto delivery is cheapest.
     zepto = ZEPTO + [offer("zepto", "Britannia White Bread", 48)]

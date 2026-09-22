@@ -46,6 +46,11 @@ def build_approval_card(
     plan = outcome.plans[plan_index]
     names = {m.id: m.display_name for m in registry.all()}
     at_preferred = {s.item for s in outcome.searches if s.store_id == preferred_store and s.matches > 0}
+    # Items where the preferred store errored/timed out: we don't KNOW they're out of
+    # stock, so don't say so.
+    unchecked_at_preferred = {
+        s.item for s in outcome.searches if s.store_id == preferred_store and s.error
+    }
     lines: list[str] = []
     notes: list[str] = []
     moved: dict[str, list[str]] = {}
@@ -56,6 +61,10 @@ def build_approval_card(
             if preferred_store and basket.store_id != preferred_store:
                 if line.item in at_preferred:
                     moved.setdefault(store, []).append(line.item.label())
+                elif line.item in unchecked_at_preferred:
+                    notes.append(
+                        f"Couldn't reach {names[preferred_store]} for {line.item.label()}, so it comes from {store}."
+                    )
                 else:
                     notes.append(
                         f"{_cap(line.item.label())} isn't in stock at {names[preferred_store]}, so it comes from {store}."

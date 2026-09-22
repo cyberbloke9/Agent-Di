@@ -28,6 +28,25 @@ def test_hindi_and_telugu_words_match_english():
     assert m.score(ShoppingItem(name="dahi"), offer("Epigamia Greek Yogurt Natural", "Epigamia")) > 0
 
 
+def test_native_script_matches():
+    # Devanagari and Telugu queries must reach English catalogue titles.
+    assert tokens("दूध") == tokens("milk")
+    assert tokens("పెరుగు") == tokens("curd")
+    assert m.score(ShoppingItem(name="दूध"), offer("Amul Taaza Toned Milk 1 L")) > 0
+    assert m.score(ShoppingItem(name="పెరుగు"), offer("Epigamia Greek Yogurt", "Epigamia")) > 0
+    assert m.score(ShoppingItem(name="टमाटर"), offer("Fresh Tomato 1 kg")) > 0
+
+
+def test_size_tolerance_is_symmetric():
+    from agentdi.commerce.models import Size
+
+    want = Size(amount=400, unit="g")
+    assert want.close_to(Size(amount=440, unit="g"))       # +10%
+    assert want.close_to(Size(amount=360, unit="g"))       # -10%
+    assert not want.close_to(Size(amount=445, unit="g"))   # +11.25% rejected
+    assert not want.close_to(Size(amount=355, unit="g"))
+
+
 def test_named_brand_is_strict():
     item = ShoppingItem(name="greek yogurt", brand="Epigamia")
     assert m.score(item, offer("Epigamia Greek Yogurt", "Epigamia")) == 1.0

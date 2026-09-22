@@ -29,9 +29,11 @@ class Size(BaseModel):
     unit: Unit
 
     def close_to(self, other: Size, tolerance: float = 0.10) -> bool:
+        # `self` is the requested size; measure the offer's deviation against it, so the
+        # band is symmetric (+/-tolerance of what was asked), not inflated by a larger pack.
         if self.unit != other.unit:
             return False
-        return abs(self.amount - other.amount) <= tolerance * max(self.amount, other.amount)
+        return abs(self.amount - other.amount) <= tolerance * self.amount
 
     def __str__(self) -> str:
         if self.unit == "g" and self.amount >= 1000 and self.amount % 100 == 0:

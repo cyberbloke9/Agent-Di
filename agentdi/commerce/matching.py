@@ -15,20 +15,42 @@ from typing import Protocol
 from agentdi.commerce.models import Offer, ShoppingItem
 
 # Everyday Indian grocery words mapped to one canonical token, so "dahi",
-# "curd" and "yogurt" all match each other.
+# "curd", "yogurt", "दही" and "పెరుగు" all match each other. Keys are romanized,
+# Devanagari (Hindi) and Telugu; add more scripts/items as the catalogue grows.
 _SYNONYMS: dict[str, str] = {
+    # curd / yogurt
     "dahi": "curd", "yogurt": "curd", "yoghurt": "curd", "perugu": "curd",
-    "doodh": "milk", "paalu": "milk",
+    "दही": "curd", "पेरुगु": "curd", "పెరుగు": "curd",
+    # milk
+    "doodh": "milk", "paalu": "milk", "paal": "milk",
+    "दूध": "milk", "पालु": "milk", "పాలు": "milk",
+    # egg
     "anda": "egg", "ande": "egg", "eggs": "egg", "guddu": "egg",
-    "pav": "bread", "roti": "bread",
-    "chawal": "rice", "biyyam": "rice",
-    "cheeni": "sugar", "chakkar": "sugar",
-    "paneer": "paneer", "cottage": "paneer",
+    "अंडा": "egg", "अंडे": "egg", "గుడ్డు": "egg",
+    # bread
+    "pav": "bread", "roti": "bread", "ब्रेड": "bread", "रोटी": "bread", "బ్రెడ్": "bread", "రొట్టె": "bread",
+    # rice
+    "chawal": "rice", "biyyam": "rice", "चावल": "rice", "బియ్యం": "rice",
+    # sugar
+    "cheeni": "sugar", "chakkar": "sugar", "चीनी": "sugar", "शक्कर": "sugar", "చక్కెర": "sugar",
+    # paneer
+    "paneer": "paneer", "cottage": "paneer", "पनीर": "paneer", "పనీర్": "paneer",
+    # potato
     "aloo": "potato", "potatoes": "potato", "bangaladumpa": "potato",
+    "आलू": "potato", "బంగాళదుంప": "potato",
+    # onion
     "pyaz": "onion", "pyaaz": "onion", "onions": "onion", "ullipaya": "onion",
-    "tamatar": "tomato", "tomatoes": "tomato",
+    "प्याज": "onion", "ప్యాజ్": "onion", "ఉల్లిపాయ": "onion",
+    # tomato
+    "tamatar": "tomato", "tomatoes": "tomato", "टमाटर": "tomato", "టమాటా": "tomato",
+    # oil
+    "tel": "oil", "तेल": "oil", "నూనె": "oil",
 }
-_TOKEN_RE = re.compile(r"[a-z0-9]+")
+# A token is a run of word chars (no underscore) OR characters in the Indic block
+# range U+0900-U+0DFF (Devanagari...Malayalam). The range is needed because Indic
+# vowel signs are combining marks, which \w excludes, so without it "दूध" would
+# split apart at the vowel sign and never match its synonym.
+_TOKEN_RE = re.compile(r"(?:[^\W_]|[ऀ-෿])+", re.UNICODE)
 
 
 def tokens(text: str) -> set[str]:
