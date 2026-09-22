@@ -60,7 +60,23 @@ def _build_service(user_id: str) -> AppService:
     return AppService(_planner(), bills, _DEMO_BILLERS, clock=lambda: datetime.now())
 
 
-app = create_app(_authenticate, _build_service)
+def _transcriber():
+    """Sarvam speech-to-text when the key is set, so the app's record button
+    works for Telugu/Hindi. None otherwise (the endpoint then returns 503)."""
+    key = os.environ.get("SARVAM_API_KEY")
+    if not key:
+        return None
+    from agentdi.calling.sarvam_voice import SarvamASR
+
+    asr = SarvamASR(key)
+
+    async def transcribe(audio: bytes, lang: str | None) -> str:
+        return (await asr.transcribe(audio, lang)).text
+
+    return transcribe
+
+
+app = create_app(_authenticate, _build_service, transcribe=_transcriber())
 
 
 if __name__ == "__main__":

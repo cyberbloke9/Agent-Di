@@ -10,9 +10,9 @@ Requires the `api` extra: pip install -e ".[api]"
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agentdi.app.dto import ActionCard, PlannedReply
@@ -75,10 +75,15 @@ class VipIn(BaseModel):
     summary: str = Field(max_length=1000)
 
 
+Transcriber = Callable[[bytes, str | None], Awaitable[str]]
+"""audio bytes + optional language hint -> transcript text."""
+
+
 def create_app(
     authenticate: Authenticator,
     build_service: ServiceBuilder,
     on_vip_summary: Callable[[str, str, str], None] | None = None,
+    transcribe: Transcriber | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Agent-Di app-service")
     # One AppService per user, cached so a settle() finds the token a handle() made.
@@ -117,6 +122,16 @@ def create_app(
         # acted on (a proactive nudge, an agent task). Hook is injected.
         if on_vip_summary is not None:
             on_vip_summary(user, body.sender, body.summary)
+
+    @app.post("/transcribe")
+    async def transcribe_ep(request: Request, lang: str | None = None, user: str = Depends(current_user)) -> dict[str, str]:
+        if transcribe is None:
+            raise HTTPException(status_code=503, detail="Speech-to-text is not configured")
+        audio = await request.body()
+        if not audio:
+            raise HTTPException(status_code=400, detail="Empty audio")
+        text = await transcribe(audio, lang)
+        return {"text": text}
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

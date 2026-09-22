@@ -24,12 +24,13 @@ def build_service(user_id: str) -> AppService:
     return AppService(Planner(FakeLLM(PLANNER)), bills, BOOK, clock=lambda: NOW)
 
 
-def client():
+def client(transcribe=None):
     VIP_CALLS.clear()
     app = create_app(
         authenticate=lambda tok: "user-1" if tok == "good-token" else None,
         build_service=build_service,
         on_vip_summary=lambda u, s, m: VIP_CALLS.append((u, s, m)),
+        transcribe=transcribe,
     )
     return TestClient(app)
 
@@ -91,3 +92,33 @@ def test_state_is_per_user():
 
 def test_healthz():
     assert client().get("/healthz").json() == {"status": "ok"}
+
+
+def test_transcribe_returns_text_and_passes_lang():
+    seen: list[tuple[bytes, str | None]] = []
+
+    async def fake(audio: bytes, lang: str | None) -> str:
+        seen.append((audio, lang))
+        return "बिजली का बिल भरो"
+
+    c = client(transcribe=fake)
+    r = c.post("/transcribe?lang=hi-IN", content=b"RIFFfakeaudio", headers=AUTH)
+    assert r.status_code == 200
+    assert r.json() == {"text": "बिजली का बिल भरो"}
+    assert seen == [(b"RIFFfakeaudio", "hi-IN")]
+
+
+def test_transcribe_503_when_unconfigured_and_400_on_empty():
+    assert client().post("/transcribe", content=b"x", headers=AUTH).status_code == 503
+
+    async def fake(audio: bytes, lang: str | None) -> str:
+        return ""
+
+    assert client(transcribe=fake).post("/transcribe", content=b"", headers=AUTH).status_code == 400
+
+
+def test_transcribe_requires_auth():
+    async def fake(audio: bytes, lang: str | None) -> str:
+        return "x"
+
+    assert client(transcribe=fake).post("/transcribe", content=b"x").status_code == 401
