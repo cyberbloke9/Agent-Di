@@ -38,3 +38,28 @@ aggregator's BBPS agent-institution API (PayU, Setu, Razorpay, ...):
    (UPI PIN / e-mandate), and returns the BBPS transaction id.
 Confirm the RBI additional-factor-authentication rules and the aggregator's
 settlement terms before going live.
+
+### Setu, in the reference server
+`agentdi/bills/setu.py` (`SetuBbps`) implements `BbpsGateway` against Setu's
+BillPay (BBPS agent/COU) API — an OAuth token, then bill fetch and pay, mapping
+Setu's response into the canonical dict `parse_bill`/`parse_receipt` expect.
+
+The reference server (`agentdi/app/server.py`, `bills_gateway()`) switches from
+the fake gateway to live Setu **only when all four are set**, otherwise it stays
+on the non-payable demo VPA:
+
+```bash
+setx SETU_CLIENT_ID        "..."
+setx SETU_CLIENT_SECRET    "..."
+setx SETU_AGENT_ID         "..."          # your BBPS agent id
+setx AGENTDI_SETTLEMENT_VPA "you@bank"     # a real account you may collect to
+setx SETU_BASE_URL         "https://prod-coudc.setu.co"   # optional; default is sandbox
+python -m agentdi.app.server
+```
+
+The user pays that settlement VPA with their **own UPI PIN**, then Setu pays the
+biller — the agent never auto-debits and never sees the PIN. The demo billers in
+the server are placeholders; a live deployment loads each user's own saved billers
+(real BBPS biller ids + consumer numbers). Confirm Setu's endpoint/field shapes
+against your sandbox first (the mapping is centralised in `_canonical_bill` /
+`_canonical_receipt`). Keep the client id/secret out of the repo and logs.

@@ -17,6 +17,7 @@ from datetime import datetime
 from agentdi.app import AppService
 from agentdi.app.api import create_app
 from agentdi.bills import BillPayAgent, Biller, BillerBook, FakeBbps
+from agentdi.bills.bbps import BbpsGateway
 from agentdi.core import Money
 from agentdi.journal import Journal
 from agentdi.planner import FakeLLM, Planner
@@ -66,11 +67,32 @@ def _shopper():
     return connect_zepto_engine(token)
 
 
+def bills_gateway() -> tuple[BbpsGateway, str, bool]:
+    """The live Setu BBPS gateway + real settlement VPA when configured, else a
+    fake gateway + a deliberately non-payable demo VPA.
+
+    Live needs SETU_CLIENT_ID, SETU_CLIENT_SECRET, SETU_AGENT_ID and
+    AGENTDI_SETTLEMENT_VPA (a real account you are authorised to collect to;
+    the user pays it by UPI PIN, then Setu pays the biller). SETU_BASE_URL
+    overrides the sandbox base for production. Returns (gateway, vpa, is_live)."""
+    cid = os.environ.get("SETU_CLIENT_ID")
+    secret = os.environ.get("SETU_CLIENT_SECRET")
+    agent = os.environ.get("SETU_AGENT_ID")
+    vpa = os.environ.get("AGENTDI_SETTLEMENT_VPA")
+    if cid and secret and agent and vpa:
+        from agentdi.bills.setu import SANDBOX_BASE, SetuBbps
+
+        base = os.environ.get("SETU_BASE_URL", SANDBOX_BASE)
+        return SetuBbps(cid, secret, agent, base_url=base), vpa, True
+    # DEMO: the non-payable VPA lets the UPI hand-off UI run but cannot debit.
+    return FakeBbps(bills=_DEMO_BILLS), "agentdi.demo@invalid", False
+
+
 def _build_service(user_id: str) -> AppService:
-    # DEMO: a deliberately non-resolvable settlement VPA so tapping "Pay with UPI"
-    # exercises the hand-off UI but cannot actually debit. Real bills need a live
-    # BBPS gateway (Setu) and a real settlement account.
-    bills = BillPayAgent(FakeBbps(bills=_DEMO_BILLS), settlement_vpa="agentdi.demo@invalid", journal=Journal())
+    gateway, settlement_vpa, _live = bills_gateway()
+    bills = BillPayAgent(gateway, settlement_vpa=settlement_vpa, journal=Journal())
+    # NOTE: _DEMO_BILLERS are placeholders. A live deployment loads the user's own
+    # saved billers (real BBPS biller ids + consumer numbers) here, per user.
     return AppService(_planner(), bills, _DEMO_BILLERS, clock=lambda: datetime.now(), shopper=_shopper())
 
 
