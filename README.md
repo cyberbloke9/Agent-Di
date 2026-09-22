@@ -16,6 +16,7 @@ pip install -e ".[dev]"
 pytest -q                 # 137 tests
 python -m agentdi.demo    # "Epigamia is out at Blinkit" → one Zepto cart, paid inside your mandate
 python -m agentdi.nl_demo # plain-language request → typed plan → cart; plus a sourcing request
+python -m agentdi.sourcing_demo  # "source transparent cups, call vendors, deliver by Friday" → ranked quotes
 ```
 
 ## What's in the box (milestone 1)
@@ -29,6 +30,7 @@ python -m agentdi.nl_demo # plain-language request → typed plan → cart; plus
 | `agentdi/mcp` | Minimal MCP client (streamable HTTP) for reaching stores' MCP servers |
 | `agentdi/payments` | UPI intent links; refuses payees from untrusted text |
 | `agentdi/planner` | Natural language (Telugu/Hindi/English) → typed plans (shop, source, pay_bill, ...) on Sarvam or any OpenAI-compatible model; safe by schema |
+| `agentdi/calling` | Declared AI vendor calls to source materials: deterministic RFQ dialogue, policy-gated sourcing agent, ranked quotes; Sarvam ASR/TTS wiring |
 | `agentdi/privacy.py` | Train-eligibility gate: user's own, opted-in, non-sensitive data only |
 
 All stores in the demo are **simulated**. No real store, payment or call is made yet.
@@ -41,9 +43,10 @@ PIN never leaves the user's phone. A four-agent security/QA audit and its
 resolutions are in `docs/audit-2026-09.md`.
 
 ## Next
-1. Pin the Zepto adapter against the live server (see `docs/zepto-integration.md`), then ONDC + BBPS.
-2. Wire the planner to a live Sarvam/vLLM endpoint (see `docs/planner.md`).
-3. Voice + telephony: IndicConformer + Indic Parler-TTS, then the declared calling agent that executes `source`/`call_business` plans (vendor RFQs).
-4. Android app: approval card, UPI hand-off, notification reader for WhatsApp VIPs.
+1. Build the CPaaS-backed `CallTransport` (Plivo/Exotel media + Sarvam ASR/TTS) so the sourcing agent places real calls — see `docs/voice-telephony.md`.
+2. A vendor directory from ONDC + saved vendors to supply listed numbers.
+3. Pin the Zepto adapter against the live server (`docs/zepto-integration.md`), then ONDC + BBPS.
+4. Wire the planner to a live Sarvam/vLLM endpoint (`docs/planner.md`).
+5. Android app: approval card, UPI hand-off, notification reader for WhatsApp VIPs.
 
 See the build map in the audit for which open model each feature uses.
