@@ -17,6 +17,7 @@ pytest -q                 # 137 tests
 python -m agentdi.demo    # "Epigamia is out at Blinkit" → one Zepto cart, paid inside your mandate
 python -m agentdi.nl_demo # plain-language request → typed plan → cart; plus a sourcing request
 python -m agentdi.sourcing_demo  # "source transparent cups, call vendors, deliver by Friday" → ranked quotes
+python -m agentdi.order_demo      # ONDC order: firm quote → pay by PIN → confirm (no auto-debit)
 ```
 
 ## What's in the box (milestone 1)
@@ -31,7 +32,7 @@ python -m agentdi.sourcing_demo  # "source transparent cups, call vendors, deliv
 | `agentdi/payments` | UPI intent links; refuses payees from untrusted text |
 | `agentdi/planner` | Natural language (Telugu/Hindi/English) → typed plans (shop, source, pay_bill, ...) on Sarvam or any OpenAI-compatible model; safe by schema |
 | `agentdi/calling` | Declared AI vendor calls to source materials: deterministic RFQ dialogue, policy-gated sourcing agent, ranked quotes; Sarvam ASR/TTS wiring |
-| `agentdi/ondc` | ONDC/Beckn vendor directory: find local sellers for a product → offers to compare/order + callable vendor contacts for the sourcing agent |
+| `agentdi/ondc` | ONDC/Beckn vendor directory + ordering (select/init/confirm): find local sellers, compare offers, order with the user's PIN (seller quotes never auto-debit) |
 | `agentdi/privacy.py` | Train-eligibility gate: user's own, opted-in, non-sensitive data only |
 
 All stores in the demo are **simulated**. No real store, payment or call is made yet.
@@ -44,7 +45,7 @@ PIN never leaves the user's phone. A four-agent security/QA audit and its
 resolutions are in `docs/audit-2026-09.md`.
 
 ## Next
-1. Live ONDC buyer-app (BAP) `BecknGateway`: onboard, sign `/search`, collect `/on_search` (see `docs/ondc.md`); then ordering (select/init/confirm).
+1. Live ONDC buyer-app (BAP) `BecknGateway`: onboard, sign `/search` `/select` `/init` `/confirm`, collect the `/on_*` callbacks (see `docs/ondc.md`); wire settlement through a payment aggregator.
 2. Build the CPaaS-backed `CallTransport` (Plivo/Exotel media + Sarvam ASR/TTS) so the sourcing agent places real calls — see `docs/voice-telephony.md`.
 3. Pin the Zepto adapter against the live server (`docs/zepto-integration.md`), then BBPS.
 4. Wire the planner to a live Sarvam/vLLM endpoint (`docs/planner.md`).
