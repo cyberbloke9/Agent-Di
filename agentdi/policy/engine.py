@@ -7,7 +7,7 @@ must give) or DENY, always with plain-language reasons.
 
 from __future__ import annotations
 
-import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -79,8 +79,14 @@ EMERGENCY_NUMBERS: frozenset[str] = frozenset(
 
 
 def normalize_phone(raw: str) -> str:
-    """Reduce an Indian number to its 10 digits; short codes stay short."""
-    digits = re.sub(r"\D", "", raw)
+    """Reduce an Indian number to its ASCII digits; short codes stay short.
+
+    Unicode digits (Devanagari, Arabic-Indic, ...) are folded to ASCII first, so
+    an emergency number typed as १०० can't slip past the emergency block.
+    """
+    digits = "".join(
+        str(unicodedata.digit(ch)) for ch in raw if ch.isdigit() and unicodedata.digit(ch, None) is not None
+    )
     if len(digits) == 12 and digits.startswith("91"):
         return digits[2:]
     if len(digits) == 11 and digits.startswith("0"):

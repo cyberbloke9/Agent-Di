@@ -234,3 +234,10 @@ def test_normalize_phone():
     assert normalize_phone("+91 98480-12345") == "9848012345"
     assert normalize_phone("09848012345") == "9848012345"
     assert normalize_phone("112") == "112"
+    assert normalize_phone("१००") == "100"  # Devanagari १००
+    assert normalize_phone("١٩٣٠") == "1930"  # Arabic-Indic ١٩٣٠
+
+
+def test_emergency_number_in_unicode_digits_is_blocked():
+    devanagari_emergency = CLINIC.model_copy(update={"phone": "११२"})  # ११२ = 112
+    assert engine.evaluate(call(devanagari_emergency), ctx()).verdict is Verdict.DENY
