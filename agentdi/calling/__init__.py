@@ -12,6 +12,7 @@ from agentdi.calling.dialogue import CallBrief, DialogueStep, RfqDialogue
 from agentdi.calling.disclosure import disclosure
 from agentdi.calling.driver import run_rfq_call
 from agentdi.calling.interfaces import ASR, CallTransport, TTS, Transcript
+from agentdi.calling.media import MediaCallTransport, MediaChannel
 from agentdi.calling.outcome import Slot, VendorQuote
 
 __all__ = [
@@ -19,6 +20,8 @@ __all__ = [
     "CallBrief",
     "CallTransport",
     "DialogueStep",
+    "MediaCallTransport",
+    "MediaChannel",
     "RfqDialogue",
     "Slot",
     "TTS",
