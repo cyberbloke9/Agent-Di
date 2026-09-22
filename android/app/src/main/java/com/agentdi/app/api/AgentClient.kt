@@ -55,6 +55,31 @@ class AgentClient(private val baseUrl: String, private val authToken: String) {
         post("/notifications/vip", JSONObject().put("sender", sender).put("summary", summary).toString())
     }
 
+    /**
+     * Upload recorded WAV audio to the server's Sarvam ASR and get the transcript.
+     * `lang` is an optional BCP-47 hint (e.g. "hi-IN", "te-IN"); null lets Sarvam
+     * auto-detect. Runs off the main thread. The transcript is only ever placed in
+     * the input box for the user to review — it never authorises anything by itself.
+     */
+    fun transcribe(wav: ByteArray, lang: String?): String {
+        val path = if (lang.isNullOrBlank()) "/transcribe" else "/transcribe?lang=$lang"
+        val conn = (URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 60000
+            doOutput = true
+            setRequestProperty("Content-Type", "audio/wav")
+            setRequestProperty("Authorization", "Bearer $authToken")
+        }
+        conn.outputStream.use { it.write(wav) }
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+        conn.disconnect()
+        if (code !in 200..299) throw RuntimeException("HTTP $code: $text")
+        return JSONObject(text).optString("text")
+    }
+
     private fun post(path: String, body: String): JSONObject {
         val conn = (URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"

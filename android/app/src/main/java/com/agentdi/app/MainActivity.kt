@@ -1,8 +1,10 @@
 package com.agentdi.app
 
+import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -13,6 +15,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.agentdi.app.api.AgentClient
+import com.agentdi.app.audio.Recorder
 import com.agentdi.app.pay.UpiHandoff
 import java.util.Locale
 import kotlin.concurrent.thread
@@ -30,10 +33,13 @@ class MainActivity : Activity() {
     private lateinit var input: EditText
     private lateinit var status: TextView
     private lateinit var cardBox: LinearLayout
+    private lateinit var recordBtn: Button
     private var pending: AgentClient.ActionCard? = null
+    private var recorder: Recorder? = null
 
     private val UPI_REQUEST = 1001
     private val VOICE_REQUEST = 1002
+    private val MIC_REQUEST = 1003
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,11 +54,13 @@ class MainActivity : Activity() {
         val buttons = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val ask = Button(this).apply { text = "Ask" }
         val mic = Button(this).apply { text = "🎤 Speak" }
+        recordBtn = Button(this).apply { text = "● Record" }
         buttons.addView(ask, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         buttons.addView(mic, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        buttons.addView(recordBtn, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
 
         status = TextView(this).apply {
-            text = "Ask or speak: pay a bill, shop, or source something."
+            text = "Type, use 🎤 Speak (on-device), or ● Record for accurate Hindi/Telugu."
             setPadding(0, 32, 0, 0)
         }
         cardBox = LinearLayout(this).apply {
@@ -66,6 +74,57 @@ class MainActivity : Activity() {
 
         ask.setOnClickListener { ask(input.text.toString().trim()) }
         mic.setOnClickListener { startVoice() }
+        recordBtn.setOnClickListener { toggleRecord() }
+    }
+
+    /**
+     * Tap to record, tap again to stop. On stop the WAV goes to the server's
+     * Sarvam ASR (accurate Indic transcription) — this is the fix for the
+     * on-device recognizer mistranslating Hindi/Telugu. The transcript only
+     * fills the input box; nothing is authorised without the usual approval card.
+     */
+    private fun toggleRecord() {
+        val r = recorder
+        if (r != null && r.isRecording) {
+            recordBtn.text = "● Record"
+            status.text = "Transcribing…"
+            r.stop()  // the worker thread finishes, transcribes, and updates the UI
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
+            return
+        }
+        startRecording()
+    }
+
+    private fun startRecording() {
+        val rec = Recorder()
+        recorder = rec
+        recordBtn.text = "■ Stop"
+        status.text = "Recording… tap Stop when done."
+        thread {
+            try {
+                val wav = rec.start()  // blocks until stop()
+                val text = client.transcribe(wav, null)  // null = let Sarvam auto-detect the language
+                runOnUiThread {
+                    recorder = null
+                    recordBtn.text = "● Record"
+                    if (text.isNotBlank()) {
+                        input.setText(text)
+                        ask(text)
+                    } else {
+                        status.text = "Didn't catch that. Try again."
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    recorder = null
+                    recordBtn.text = "● Record"
+                    status.text = "Error: ${e.message}"
+                }
+            }
+        }
     }
 
     private fun startVoice() {
@@ -118,6 +177,17 @@ class MainActivity : Activity() {
                     startActivityForResult(UpiHandoff.intentFor(card.upiUri), UPI_REQUEST)
                 }
             })
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == MIC_REQUEST) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                startRecording()
+            } else {
+                status.text = "Mic permission needed to record. You can still type or use 🎤 Speak."
+            }
         }
     }
 
