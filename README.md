@@ -13,8 +13,9 @@ Design and research: [Instinct India Audit](https://claude.ai/artifact/L2FtVw8Gu
 ## Try it
 ```bash
 pip install -e ".[dev]"
-pytest -q                 # 121 tests
+pytest -q                 # 137 tests
 python -m agentdi.demo    # "Epigamia is out at Blinkit" → one Zepto cart, paid inside your mandate
+python -m agentdi.nl_demo # plain-language request → typed plan → cart; plus a sourcing request
 ```
 
 ## What's in the box (milestone 1)
@@ -27,6 +28,7 @@ python -m agentdi.demo    # "Epigamia is out at Blinkit" → one Zepto cart, pai
 | `agentdi/commerce/stores/zepto.py` | Zepto adapter over its official MCP server (search-only; see `docs/zepto-integration.md`) |
 | `agentdi/mcp` | Minimal MCP client (streamable HTTP) for reaching stores' MCP servers |
 | `agentdi/payments` | UPI intent links; refuses payees from untrusted text |
+| `agentdi/planner` | Natural language (Telugu/Hindi/English) → typed plans (shop, source, pay_bill, ...) on Sarvam or any OpenAI-compatible model; safe by schema |
 | `agentdi/privacy.py` | Train-eligibility gate: user's own, opted-in, non-sensitive data only |
 
 All stores in the demo are **simulated**. No real store, payment or call is made yet.
@@ -40,8 +42,8 @@ resolutions are in `docs/audit-2026-09.md`.
 
 ## Next
 1. Pin the Zepto adapter against the live server (see `docs/zepto-integration.md`), then ONDC + BBPS.
-2. Planner on `sarvamai/sarvam-30b`: turn "milk, bread, Epigamia" (Telugu, Hindi or English) into typed intents.
-3. Android app: approval card, UPI hand-off, notification reader for WhatsApp VIPs.
-4. Voice: IndicConformer + Indic Parler-TTS, then the declared calling agent.
+2. Wire the planner to a live Sarvam/vLLM endpoint (see `docs/planner.md`).
+3. Voice + telephony: IndicConformer + Indic Parler-TTS, then the declared calling agent that executes `source`/`call_business` plans (vendor RFQs).
+4. Android app: approval card, UPI hand-off, notification reader for WhatsApp VIPs.
 
 See the build map in the audit for which open model each feature uses.
