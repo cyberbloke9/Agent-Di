@@ -24,11 +24,11 @@ Unit: build a `Planner(llm)` and `await planner.plan("...")`.
 ```python
 from agentdi.planner import Planner, OpenAICompatLLM
 
-# Sarvam's hosted API:
+# Sarvam's hosted API (confirmed 2026-09; chat is OpenAI-compatible with Bearer auth):
 llm = OpenAICompatLLM(
-    base_url="https://api.sarvam.ai/v1",   # confirm against Sarvam's current docs
+    base_url="https://api.sarvam.ai/v1",   # chat completions at /v1/chat/completions
     api_key="<SARVAM_API_KEY>",            # a credential: keep it out of the repo/logs
-    model="sarvam-m",                       # or the hosted sarvam-30b id
+    model="sarvam-105b",                    # current flagship chat model
 )
 # Or a self-hosted vLLM server exposing sarvamai/sarvam-30b:
 # llm = OpenAICompatLLM(base_url="http://localhost:8000/v1", api_key="x", model="sarvamai/sarvam-30b")

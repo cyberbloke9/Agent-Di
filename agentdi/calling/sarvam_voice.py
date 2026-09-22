@@ -6,8 +6,11 @@ confirm endpoint paths and field names against Sarvam's current docs before
 going live. A self-hosted alternative (IndicConformer for ASR, Indic Parler-TTS
 for TTS) implements the same two protocols.
 
-The api_key is a credential — keep it out of the repo and logs. Call media must
-stay in India (Plivo India requirement); host these and the CPaaS accordingly.
+Endpoints (confirmed 2026-09): STT https://api.sarvam.ai/speech-to-text
+(model saaras:v4), TTS https://api.sarvam.ai/text-to-speech (bulbul:v3), auth
+header `api-subscription-key`. The api_key is a credential — keep it out of the
+repo and logs. Call media must stay in India (Plivo India requirement); host
+these and the CPaaS accordingly.
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ SARVAM_BASE = "https://api.sarvam.ai"
 
 
 class SarvamASR:
-    def __init__(self, api_key: str, base_url: str = SARVAM_BASE, model: str = "saarika:v2", timeout: float = 30.0,
+    def __init__(self, api_key: str, base_url: str = SARVAM_BASE, model: str = "saaras:v4", timeout: float = 30.0,
                  client: object | None = None) -> None:
         self._url = base_url.rstrip("/") + "/speech-to-text"
         self._key = api_key
@@ -55,7 +58,8 @@ class SarvamASR:
 
 
 class SarvamTTS:
-    def __init__(self, api_key: str, base_url: str = SARVAM_BASE, speaker: str = "meera", timeout: float = 30.0,
+    # Current TTS is bulbul:v3 with named speakers (e.g. "anushka", "shubh").
+    def __init__(self, api_key: str, base_url: str = SARVAM_BASE, speaker: str = "anushka", timeout: float = 30.0,
                  client: object | None = None) -> None:
         self._url = base_url.rstrip("/") + "/text-to-speech"
         self._key = api_key
