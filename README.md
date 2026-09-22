@@ -18,6 +18,7 @@ python -m agentdi.demo    # "Epigamia is out at Blinkit" → one Zepto cart, pai
 python -m agentdi.nl_demo # plain-language request → typed plan → cart; plus a sourcing request
 python -m agentdi.sourcing_demo  # "source transparent cups, call vendors, deliver by Friday" → ranked quotes
 python -m agentdi.order_demo      # ONDC order: firm quote → pay by PIN → confirm (no auto-debit)
+python -m agentdi.bill_demo       # "pay my electricity bill" → fetch → pay by PIN; AutoPay left to the bank
 ```
 
 ## What's in the box (milestone 1)
@@ -33,6 +34,7 @@ python -m agentdi.order_demo      # ONDC order: firm quote → pay by PIN → co
 | `agentdi/planner` | Natural language (Telugu/Hindi/English) → typed plans (shop, source, pay_bill, ...) on Sarvam or any OpenAI-compatible model; safe by schema |
 | `agentdi/calling` | Declared AI vendor calls to source materials: deterministic RFQ dialogue, policy-gated sourcing agent, ranked quotes; Sarvam ASR/TTS wiring |
 | `agentdi/ondc` | ONDC/Beckn vendor directory + ordering (select/init/confirm): find local sellers, compare offers, order with the user's PIN (seller quotes never auto-debit) |
+| `agentdi/bills` | BBPS bill payments: resolve a saved biller, fetch the bill, pay by PIN (AutoPay is left to the bank; amounts never auto-debit) |
 | `agentdi/privacy.py` | Train-eligibility gate: user's own, opted-in, non-sensitive data only |
 
 All stores in the demo are **simulated**. No real store, payment or call is made yet.
