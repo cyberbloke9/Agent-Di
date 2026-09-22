@@ -1,66 +1,81 @@
 package com.agentdi.app.api
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
- * Thin client for the Agent-Di app-service (the Python AppService exposed over
- * HTTP). The service is the source of truth for every action; the app only
- * renders cards and launches the UPI intent. All money still requires the
- * user's PIN inside their own UPI app.
+ * Client for the Agent-Di app-service, using only the Android SDK
+ * (HttpURLConnection + org.json) so the app has no external dependencies. The
+ * service is the source of truth for every action; the app only renders cards
+ * and launches the UPI intent. All money still requires the user's PIN inside
+ * their own UPI app. Call these off the main thread.
  */
 class AgentClient(private val baseUrl: String, private val authToken: String) {
 
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
-
-    private val json = Json { ignoreUnknownKeys = true }
-
-    @Serializable data class HandleRequest(val utterance: String)
-    @Serializable data class ActionCard(
+    data class ActionCard(
         val token: String,
         val title: String,
-        val lines: List<String> = emptyList(),
-        val total: String? = null,
-        val authorization: String = "none",
-        val upiUri: String? = null,
-        val notes: List<String> = emptyList(),
+        val lines: List<String>,
+        val total: String?,
+        val authorization: String,
+        val upiUri: String?,
+        val notes: List<String>,
     )
-    @Serializable data class PlannedReply(val kind: String, val message: String, val card: ActionCard? = null)
-    @Serializable data class SettleRequest(val token: String, val status: String, val txnRef: String? = null)
-    @Serializable data class PaymentOutcome(val ok: Boolean, val message: String, val reference: String? = null)
 
-    suspend fun handle(utterance: String): PlannedReply =
-        post("/handle", json.encodeToString(HandleRequest.serializer(), HandleRequest(utterance)),
-            PlannedReply.serializer())
+    data class PlannedReply(val kind: String, val message: String, val card: ActionCard?)
 
-    suspend fun settle(token: String, status: String, txnRef: String?): PaymentOutcome =
-        post("/settle", json.encodeToString(SettleRequest.serializer(), SettleRequest(token, status, txnRef)),
-            PaymentOutcome.serializer())
+    data class PaymentOutcome(val ok: Boolean, val message: String, val reference: String?)
+
+    fun handle(utterance: String): PlannedReply {
+        val res = post("/handle", JSONObject().put("utterance", utterance).toString())
+        val cardObj = res.optJSONObject("card")
+        val card = if (cardObj == null) null else ActionCard(
+            token = cardObj.optString("token"),
+            title = cardObj.optString("title"),
+            lines = cardObj.optJSONArray("lines").toStringList(),
+            total = cardObj.stringOrNull("total"),
+            authorization = cardObj.optString("authorization", "none"),
+            upiUri = cardObj.stringOrNull("upiUri"),
+            notes = cardObj.optJSONArray("notes").toStringList(),
+        )
+        return PlannedReply(res.optString("kind"), res.optString("message"), card)
+    }
+
+    fun settle(token: String, status: String, txnRef: String?): PaymentOutcome {
+        val body = JSONObject().put("token", token).put("status", status)
+        if (txnRef != null) body.put("txnRef", txnRef)
+        val res = post("/settle", body.toString())
+        return PaymentOutcome(res.optBoolean("ok"), res.optString("message"), res.stringOrNull("reference"))
+    }
 
     /** The on-device notification reader forwards ONLY already-VIP, non-OTP summaries. */
-    suspend fun forwardVipSummary(sender: String, summary: String) {
-        post("/notifications/vip", """{"sender":${json.encodeToString(String.serializer(), sender)},""" +
-            """"summary":${json.encodeToString(String.serializer(), summary)}}""", Unit.serializer())
+    fun forwardVipSummary(sender: String, summary: String) {
+        post("/notifications/vip", JSONObject().put("sender", sender).put("summary", summary).toString())
     }
 
-    private fun <T> post(path: String, body: String, deserializer: kotlinx.serialization.KSerializer<T>): T {
-        val req = Request.Builder()
-            .url(baseUrl.trimEnd('/') + path)
-            .addHeader("Authorization", "Bearer $authToken")
-            .post(body.toRequestBody("application/json".toMediaType()))
-            .build()
-        http.newCall(req).execute().use { resp ->
-            val text = resp.body?.string().orEmpty()
-            require(resp.isSuccessful) { "HTTP ${resp.code}: $text" }
-            return json.decodeFromString(deserializer, text.ifEmpty { "{}" })
+    private fun post(path: String, body: String): JSONObject {
+        val conn = (URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 40000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Authorization", "Bearer $authToken")
         }
+        conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+        conn.disconnect()
+        if (code !in 200..299) throw RuntimeException("HTTP $code: $text")
+        return if (text.isBlank()) JSONObject() else JSONObject(text)
     }
 }
+
+private fun JSONArray?.toStringList(): List<String> =
+    if (this == null) emptyList() else (0 until length()).map { optString(it) }
+
+private fun JSONObject.stringOrNull(key: String): String? =
+    if (!has(key) || isNull(key)) null else optString(key)

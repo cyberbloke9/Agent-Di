@@ -72,6 +72,35 @@ your UPI app against the **test** VPA (it won't complete — that's expected). T
 Hindi/Telugu too; the planner understands them. To test the WhatsApp reader,
 enable notification access for the app in system settings.
 
+## Building behind a TLS-intercepting proxy
+If Gradle downloads fail with certificate errors (a corporate/proxy CA), build a
+Java truststore that includes the machine's root certs, then point the build JVM
+at it. PowerShell (uses Android Studio's keytool):
+```powershell
+$jbr = "C:\Program Files\Android\Android Studio\jbr"
+$store = Join-Path $env:TEMP "agentdi-cacerts"
+Copy-Item (Join-Path $jbr "lib\security\cacerts") $store -Force
+$kt = Join-Path $jbr "bin\keytool.exe"; $i=0
+Get-ChildItem Cert:\LocalMachine\Root, Cert:\CurrentUser\Root | Sort-Object Thumbprint -Unique | ForEach-Object {
+  $i++; $f = Join-Path $env:TEMP "c$i.cer"; [IO.File]::WriteAllBytes($f, $_.RawData)
+  & $kt -importcert -noprompt -keystore $store -storepass changeit -alias "winroot$i" -file $f 2>$null
+}
+```
+Then build (with `--no-daemon`, the flags reach the build JVM):
+```powershell
+$gradle = "<a cached gradle>\bin\gradle.bat"   # e.g. under ~/.gradle/wrapper/dists
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+& $gradle assembleDebug --no-daemon `
+  "-Djavax.net.ssl.trustStore=$env:TEMP\agentdi-cacerts" "-Djavax.net.ssl.trustStorePassword=changeit"
+```
+Android Studio itself already trusts the proxy CA, so a normal AS build/run needs
+none of this.
+
+## No external dependencies
+This app deliberately uses only the Android SDK (Views, `HttpURLConnection`,
+`org.json`) so it builds with nothing to download beyond AGP/Kotlin. A richer
+Compose UI can come once the network/proxy allows dependency downloads.
+
 ## Later
 - Wire `VipStore`/`AgentBridge` to DataStore + a background scope (and post VIP
   summaries via `AgentClient.forwardVipSummary`).

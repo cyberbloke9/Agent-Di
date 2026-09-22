@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -29,22 +27,10 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
 }
 
+// No external dependencies on purpose: pure Android SDK (Views, HttpURLConnection,
+// org.json), so the app builds fully offline. Networking/JSON/UPI all use the
+// framework; the Kotlin stdlib is added automatically by the Kotlin plugin.
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.compose.material3)
-    implementation(libs.okhttp)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.kotlinx.coroutines.android)
 }
