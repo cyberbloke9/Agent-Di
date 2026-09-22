@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declares Agent-Di as a digital assistant. supportsAssist=true makes it appear in
+  the "Digital assistant app" picker and receive the assist gesture. No hotword
+  attributes: invocation is the gesture, not a wake word.
+-->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.agentdi.app.assist.AgentVoiceInteractionSessionService"
+    android:recognitionService="com.agentdi.app.assist.AgentRecognitionService"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="false" />

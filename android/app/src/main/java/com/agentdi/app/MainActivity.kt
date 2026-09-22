@@ -41,6 +41,10 @@ class MainActivity : Activity() {
     private val VOICE_REQUEST = 1002
     private val MIC_REQUEST = 1003
 
+    companion object {
+        const val EXTRA_UTTERANCE = "com.agentdi.app.UTTERANCE"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -67,7 +71,14 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 32, 0, 0)
         }
-        listOf(title, input, buttons, status, cardBox).forEach {
+        // Opens the system "Digital assistant app" picker so the user can set
+        // Agent-Di as their default assistant (then the assist gesture — long-press
+        // home / power — launches it over any app, like the Assistant slot).
+        val assistantBtn = Button(this).apply {
+            text = "Enable as phone assistant"
+            setOnClickListener { openAssistantSettings() }
+        }
+        listOf(title, input, buttons, status, cardBox, assistantBtn).forEach {
             root.addView(it, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         setContentView(ScrollView(this).apply { addView(root) })
@@ -75,6 +86,20 @@ class MainActivity : Activity() {
         ask.setOnClickListener { ask(input.text.toString().trim()) }
         mic.setOnClickListener { startVoice() }
         recordBtn.setOnClickListener { toggleRecord() }
+
+        // The assistant session forwards its utterance here so the audited
+        // approval-card + UPI-PIN + settle flow runs in the Activity, never in
+        // the overlay session (design rule: money stays in the audited path).
+        intent?.getStringExtra(EXTRA_UTTERANCE)?.trim()?.let { if (it.isNotEmpty()) { input.setText(it); ask(it) } }
+    }
+
+    private fun openAssistantSettings() {
+        // VOICE_INPUT_SETTINGS is where the "Digital assistant app" chooser lives.
+        val actions = listOf("android.settings.VOICE_INPUT_SETTINGS", android.provider.Settings.ACTION_SETTINGS)
+        for (a in actions) {
+            try { startActivity(Intent(a)); return } catch (_: Exception) {}
+        }
+        status.text = "Open Settings > Apps > Default apps > Digital assistant app, and pick Agent-Di."
     }
 
     /**

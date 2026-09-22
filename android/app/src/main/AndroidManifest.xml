@@ -30,6 +30,39 @@
         </activity>
 
         <!--
+          Assistant slot: once the user picks Agent-Di as the default Digital
+          assistant app, the assist gesture (long-press home / power) starts
+          AgentVoiceInteractionSession over any app. The session never moves money;
+          a payment card is handed to MainActivity for the audited PIN flow.
+        -->
+        <service
+            android:name=".assist.AgentVoiceInteractionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".assist.AgentVoiceInteractionSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <!-- Stub recognizer: required by the assistant registration; Agent-Di does STT server-side. -->
+        <service
+            android:name=".assist.AgentRecognitionService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+
+        <!--
           Reads incoming notifications so it can surface messages from the people
           the user marks important. The user must turn this on in system settings
           (Settings > Notifications > Notification access). Non-VIP and OTP-like
